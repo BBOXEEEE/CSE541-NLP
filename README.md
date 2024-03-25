@@ -4,4 +4,4 @@
 
 ## 📚 강의 내용을 정리한 블로그
 
-- [2주차: Text Preprocessing](https://blog.sxhxun.com/posts/nlp-text-preprocessing)
+- [3주차: Text Preprocessing](https://blog.sxhxun.com/posts/nlp-text-preprocessing)
