@@ -9,3 +9,5 @@
 *.yaml
 *.ckpt
 *aclImdb
+*lightning_logs
+*txt_sentoken
