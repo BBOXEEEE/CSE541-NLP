@@ -96,8 +96,8 @@ tokenized_train_dataset = []
 tokenized_test_dataset = []  
   
 for data in tqdm(train_data):  
-    text = data[1].lower().replace('<br />', '')  # Remove <br /> tags and lowercase  
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation  
+    text = data[1].lower().replace('<br />', '') 
+    text = re.sub(r'[^\w\s]', '', text) 
     tokens = word_tokenize(text)  
     tokens = [word for word in tokens if word not in stop_words]  
     tokens = [stemmer.stem(word) for word in tokens]  
@@ -105,8 +105,8 @@ for data in tqdm(train_data):
     tokenized_train_dataset.append((tokens, labels))  
   
 for data in tqdm(test_data):  
-    text = data[1].lower().replace('<br />', '')  # Remove <br /> tags and lowercase  
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation  
+    text = data[1].lower().replace('<br />', '')
+    text = re.sub(r'[^\w\s]', '', text)
     tokens = word_tokenize(text)  
     tokens = [word for word in tokens if word not in stop_words]  
     tokens = [stemmer.stem(word) for word in tokens]  
@@ -676,8 +676,83 @@ check_performance(cnn_lstm_model, vocab, tokenized_train_dataset, tokenized_test
 
 ![](../../assets/HW02/wandb04.png)
 
+### 3.5 추가 코드!!!
 
-## 🐮🍊 소감
+과제 제출 후 몇가지 실험을 해보다 성능이 더 좋은 모델을 발견했다.
+
+```python
+class CNN_biLSTM(nn.Module):  
+    def __init__(self, vocab_size):  
+        super(CNN_biLSTM, self).__init__()  
+        self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(embedding_lookup_matrix), freeze=False)  
+  
+        self.conv1 = nn.Conv2d(1, 128, (3, 200))  
+        self.conv2 = nn.Conv2d(1, 128, (5, 200))  
+        self.conv3 = nn.Conv2d(1, 128, (7, 200))  
+        self.conv4 = nn.Conv2d(1, 128, (9, 200))  
+  
+        self.dropout = nn.Dropout(0.5)  
+        self.bn = nn.BatchNorm1d(128)  
+  
+        self.rnn = nn.LSTM(128, 128, batch_first=True, num_layers=1, bidirectional=True)  
+        self.fc = nn.Sequential(  
+            nn.Linear(4*128*2, 256),  
+            nn.ReLU(),  
+            nn.Linear(256, 2)  
+        )  
+      
+    def forward(self, x):  
+        embedding = self.embedding(x).unsqueeze(1)  
+  
+        conv1_feature = F.relu(self.conv1(embedding).squeeze(3))  
+        conv2_feature = F.relu(self.conv2(embedding).squeeze(3))  
+        conv3_feature = F.relu(self.conv3(embedding).squeeze(3))  
+        conv4_feature = F.relu(self.conv4(embedding).squeeze(3))  
+  
+        max1 = F.max_pool1d(conv1_feature, conv1_feature.size(2)).squeeze(2)  
+        max2 = F.max_pool1d(conv2_feature, conv2_feature.size(2)).squeeze(2)  
+        max3 = F.max_pool1d(conv3_feature, conv3_feature.size(2)).squeeze(2)  
+        max4 = F.max_pool1d(conv4_feature, conv4_feature.size(2)).squeeze(2)  
+          
+        max1 = self.bn(self.dropout(max1))  
+        max2 = self.bn(self.dropout(max2))  
+        max3 = self.bn(self.dropout(max3))  
+        max4 = self.bn(self.dropout(max4))  
+  
+        rnn1, _ = self.rnn(max1)  
+        rnn2, _ = self.rnn(max2)  
+        rnn3, _ = self.rnn(max3)  
+        rnn4, _ = self.rnn(max4)  
+          
+        x = torch.cat([rnn1, rnn2, rnn3, rnn4], dim=1)  
+        # print(x.size())  
+  
+        x = self.fc(x)  
+  
+        return x
+```
+
+- 위에서 제시한 최종모델과의 차이점은 LSTM이 아닌 `BiLSTM` 을 사용했다는 것이다.
+- 양방향으로 학습하는 것이 문맥을 파악하는데 더 효과적이지 않을까 생각해서 적용을 해보았고, 결과는 다음과 같다.
+
+![](../../assets/HW02/result14.png)
+
+- 먼저 Model Summary는 위와 같다.
+- 전체 모델의 메모리는 CNN-LSTM 모델보다 4MB 정도 증가했고, 총 파라미터의 수는 약 0.5M 정도 증가했다.
+
+어떤 epoch에서 성능이 잘 나오는지 찾기 위해 테스트를 해본 결과 아래 `wandb` 그래프와 같이 `epoch = 3` 에서 가장 좋은 성능이 나왔다.
+
+![](../../assets/HW02/wandb05.png)
+
+- 평균적으로 **90%** 이상의 정확도를 보여주었다.
+- 가장 높게 나온 정확도는 **93.7%** 였다.
+- 아래는 Colab에서 돌린 결과를 캡처한 것이다.
+	- **Test Accuracy 92.49%**
+
+![](../../assets/HW02/result15.png)
+
+---
+## 소감
 
 이번 과제를 진행하면서 실습시간에 배운 모델들을 가지고 여러가지 변형도 해보면서 다양한 시도를 해보았다.
 딥러닝 그리고 자연어처리가 왜 **상황과 목적에 맞게** 선택해야 하고 정답이 없는지 다시금 느낀 것 같다.
